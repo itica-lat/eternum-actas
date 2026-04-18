@@ -1,0 +1,11 @@
+/* App-level overrides not covered by Tailwind utilities */
+body {
+  height: 100vh;
+  overflow: hidden;
+}
+
+#root {
+  max-width: none;
+  border: none;
+  text-align: left;
+}
