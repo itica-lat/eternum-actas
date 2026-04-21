@@ -1,196 +1,60 @@
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import { useState, useMemo, useCallback, useRef } from 'react'
 import { parseMarkdown } from './lib/markdownParser'
 import { generateHTML } from './lib/htmlExporter'
-import { SLASH_COMMANDS, filterCommands } from './lib/slashCommands'
-import type { SlashCommand } from './lib/slashCommands'
+import { buildMarkdownFromTemplate } from './lib/templateUtils'
 import { SlashPalette } from './components/SlashPalette'
 import { SettingsPanel } from './components/SettingsPanel'
+import { TemplatesPanel } from './components/TemplatesPanel'
 import { defaultDocSettings } from './types'
-import type { DocSettings } from './types'
+import type { DocSettings, Template } from './types'
+import { useSlashCommands } from './hooks/useSlashCommands'
+import { useExport } from './hooks/useExport'
+import { useFileLoad } from './hooks/useFileLoad'
+import { useAutoSave, loadAutoSave } from './hooks/useAutoSave'
+import { useTemplates } from './hooks/useTemplates'
+import { EXAMPLE_MD } from './constants/exampleMarkdown'
 import './App.css'
 
-const EXAMPLE_MD = `# Guía de preguntas para el relevamiento
-_Uso interno del equipo · no distribuir sin revisión_
-
-## :icon:user: Contexto y rol del entrevistado
-
-### Duración estimada · 5 min
-
-_«¿Cuál es tu rol en la coordinación de informática?»_
-
-_«¿Cuánto tiempo llevás en ese rol?»_
-
----
-
-## :icon:flame: Puntos de dolor
-
-> La frecuencia e impacto de cada dolor definen la priorización de módulos.
-
-- ¿Con qué frecuencia pasa eso?
-- ¿Cuánto tiempo llevó resolverlo?
-- ¿Qué impacto tuvo en la clase?
-
----
-
-## :icon:git-branch: Estado actual del sistema
-
-1. ¿Qué herramientas usás hoy para registrar incidentes?
-2. ¿Cómo se comunica el estado de un equipo a dirección?
-3. ¿Existe algún registro histórico accesible?
-
-### Nota sobre el módulo de reportes
-
-El sistema actual **no exporta** datos estructurados. Verificar si hay registros en \`hojas de cálculo\` o correos.
-
-Módulo priorizado: :badge:alta prioridad:
-
----refs---
-ITI CETP. (2026). *Documento del proyecto SGRSI*. Interno.
-Equipo Eternum. (2026). *Guía de relevamiento v1*. Uso interno.
-`
-
-interface SlashTrigger {
-  query: string
-  slashStart: number
-  selectedIndex: number
-  offsetTop: number
-}
-
 export default function App() {
-  const [markdown, setMarkdown]         = useState(EXAMPLE_MD)
-  const [filename, setFilename]         = useState('documento')
-  const [docSettings, setDocSettings]   = useState<DocSettings>(defaultDocSettings)
+  // Restore from autosave on first mount, fall back to defaults
+  const [markdown, setMarkdown]         = useState(() => loadAutoSave()?.markdown    ?? EXAMPLE_MD)
+  const [filename, setFilename]         = useState(() => loadAutoSave()?.filename    ?? 'documento')
+  const [docSettings, setDocSettings]   = useState<DocSettings>(() => loadAutoSave()?.docSettings ?? defaultDocSettings)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [slashTrigger, setSlashTrigger] = useState<SlashTrigger | null>(null)
+  const [templatesOpen, setTemplatesOpen] = useState(false)
+  const wasRestored = useRef(!!loadAutoSave())
 
-  const textareaRef       = useRef<HTMLTextAreaElement>(null)
-  const editorPaneRef     = useRef<HTMLDivElement>(null)
-  const iframeRef         = useRef<HTMLIFrameElement>(null)
-  const fileInputRef      = useRef<HTMLInputElement>(null)
-  const pendingCursorRef  = useRef<number | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const iframeRef   = useRef<HTMLIFrameElement>(null)
 
   const parseResult = useMemo(() => parseMarkdown(markdown), [markdown])
   const fullHTML    = useMemo(() => generateHTML(parseResult, docSettings), [parseResult, docSettings])
 
-  // Set cursor after markdown state update
-  useEffect(() => {
-    if (pendingCursorRef.current !== null && textareaRef.current) {
-      const pos = pendingCursorRef.current
-      textareaRef.current.setSelectionRange(pos, pos)
-      pendingCursorRef.current = null
-    }
-  }, [markdown])
+  const { slashTrigger, detectSlash, closeSlash, insertSlashCommand, filteredCommands, handleSlashKeyDown } =
+    useSlashCommands({ markdown, setMarkdown, textareaRef })
 
-  // ── Slash command detection ──────────────────────────────────────────────
-  const detectSlash = useCallback((value: string, cursor: number) => {
-    const textBefore = value.slice(0, cursor)
-    const match = textBefore.match(/(?:^|\n| )\/(\w*)$/)
-    if (!match) { setSlashTrigger(null); return }
+  const { handleDownloadHTML, handleExportPDF } = useExport({ fullHTML, filename })
+  const { fileInputRef, triggerFileLoad, handleFileLoad } = useFileLoad({ setMarkdown, setFilename })
+  const { status: saveStatus } = useAutoSave(markdown, filename, docSettings)
+  const { templates, saveTemplate, deleteTemplate } = useTemplates()
 
-    const slashPos = textBefore.lastIndexOf('/')
-    const query = match[1].toLowerCase()
-
-    // Approximate cursor Y within editor pane
-    const linesBeforeCursor = value.slice(0, cursor).split('\n').length
-    const lineHeight = 22 // 12.5px * 1.75
-    const paddingTop = 16
-    const scrollTop  = textareaRef.current?.scrollTop ?? 0
-    const approxTop  = paddingTop + linesBeforeCursor * lineHeight - scrollTop
-
-    setSlashTrigger(prev => ({
-      query,
-      slashStart: slashPos,
-      selectedIndex: prev?.slashStart === slashPos ? prev.selectedIndex : 0,
-      offsetTop: Math.max(8, approxTop),
-    }))
-  }, [])
-
-  const closeSlash = useCallback(() => setSlashTrigger(null), [])
-
-  // ── Insert slash command ─────────────────────────────────────────────────
-  const insertSlashCommand = useCallback((cmd: SlashCommand) => {
-    if (!slashTrigger || !textareaRef.current) return
-    const cursor = textareaRef.current.selectionStart
-    const before = markdown.slice(0, slashTrigger.slashStart)
-    const after  = markdown.slice(cursor)
-    const newText = before + cmd.snippet + after
-    const newCursor = slashTrigger.slashStart + cmd.snippet.length - (cmd.cursorOffset ?? 0)
-    pendingCursorRef.current = newCursor
-    setMarkdown(newText)
-    setSlashTrigger(null)
-  }, [markdown, slashTrigger])
-
-  // ── Editor handlers ──────────────────────────────────────────────────────
   const handleEditorChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value
-    setMarkdown(value)
-    detectSlash(value, e.target.selectionStart)
+    setMarkdown(e.target.value)
+    detectSlash(e.target.value, e.target.selectionStart)
   }, [detectSlash])
 
-  const filteredCommands = useMemo(
-    () => slashTrigger ? filterCommands(slashTrigger.query) : SLASH_COMMANDS,
-    [slashTrigger]
-  )
+  // Opening one panel closes the other
+  const openSettings  = useCallback(() => { setSettingsOpen(true);  setTemplatesOpen(false) }, [])
+  const openTemplates = useCallback(() => { setTemplatesOpen(true); setSettingsOpen(false)  }, [])
 
-  const handleEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (!slashTrigger) return
-    const len = filteredCommands.length
-    if (len === 0) return
-
-    if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      setSlashTrigger(p => p ? { ...p, selectedIndex: (p.selectedIndex + 1) % len } : null)
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      setSlashTrigger(p => p ? { ...p, selectedIndex: (p.selectedIndex - 1 + len) % len } : null)
-    } else if (e.key === 'Enter' || e.key === 'Tab') {
-      e.preventDefault()
-      insertSlashCommand(filteredCommands[slashTrigger.selectedIndex])
-    } else if (e.key === 'Escape') {
-      e.preventDefault()
-      setSlashTrigger(null)
-    }
-  }, [slashTrigger, filteredCommands, insertSlashCommand])
-
-  // ── File load ────────────────────────────────────────────────────────────
-  const handleFileLoad = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setFilename(file.name.replace(/\.md$/i, ''))
-    const reader = new FileReader()
-    reader.onload = ev => {
-      if (typeof ev.target?.result === 'string') setMarkdown(ev.target.result)
-    }
-    reader.readAsText(file)
-    e.target.value = ''
+  const handleApplyTemplate = useCallback((tpl: Template) => {
+    setDocSettings(tpl.docSettings)
+    setMarkdown(buildMarkdownFromTemplate(tpl))
+    setTemplatesOpen(false)
   }, [])
 
-  // ── Export HTML ──────────────────────────────────────────────────────────
-  const handleDownloadHTML = useCallback(() => {
-    const blob = new Blob([fullHTML], { type: 'text/html;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${filename || 'documento'}.html`
-    a.click()
-    URL.revokeObjectURL(url)
-  }, [fullHTML, filename])
-
-  // ── Export PDF ───────────────────────────────────────────────────────────
-  const handleExportPDF = useCallback(() => {
-    const blob = new Blob([fullHTML], { type: 'text/html;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const win = window.open(url, '_blank')
-    if (win) {
-      win.onload = () => {
-        win.print()
-        setTimeout(() => URL.revokeObjectURL(url), 15000)
-      }
-    }
-  }, [fullHTML])
-
-  const errors  = parseResult.warnings.filter(w => w.startsWith('Error:'))
-  const notices = parseResult.warnings.filter(w => !w.startsWith('Error:'))
+  const errors      = parseResult.warnings.filter(w => w.startsWith('Error:'))
+  const notices     = parseResult.warnings.filter(w => !w.startsWith('Error:'))
   const hasWarnings = errors.length > 0 || notices.length > 0
 
   return (
@@ -208,9 +72,26 @@ export default function App() {
                            text-aqua/70 bg-aqua/8 tracking-wide uppercase font-medium">
             {docSettings.type === 'acta' ? 'Acta' : 'Documento'}
           </span>
+          {/* Restored from autosave badge (shown once) */}
+          {wasRestored.current && (
+            <span className="px-2 py-0.5 rounded-md text-[10px] border border-amber-400/25
+                             text-amber-300/70 bg-amber-400/8 tracking-wide">
+              retomado
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Autosave indicator */}
+          <span className={`text-[10px] transition-opacity duration-300
+            ${saveStatus === 'pending' ? 'text-white/30 opacity-100' : ''}
+            ${saveStatus === 'saved'   ? 'text-aqua/50 opacity-100' : ''}
+            ${saveStatus === 'idle'    ? 'opacity-0'               : ''}`}>
+            {saveStatus === 'pending' ? '○ guardando…' : '● guardado'}
+          </span>
+
+          <span className="w-px h-4 bg-white/15" />
+
           {/* Filename */}
           <div className="flex items-center bg-white/8 border border-white/15 rounded-md overflow-hidden">
             <input
@@ -226,7 +107,7 @@ export default function App() {
           </div>
 
           {/* Load */}
-          <button onClick={() => fileInputRef.current?.click()}
+          <button onClick={triggerFileLoad}
             className="px-3 py-1.5 rounded-md text-xs bg-white/8 border border-white/15
                        text-white/70 hover:bg-white/14 hover:text-white transition-colors cursor-pointer">
             Cargar .md
@@ -258,9 +139,26 @@ export default function App() {
             Exportar HTML
           </button>
 
+          {/* Templates toggle */}
+          <button
+            onClick={templatesOpen ? () => setTemplatesOpen(false) : openTemplates}
+            aria-label="Plantillas"
+            title="Plantillas"
+            className={`p-1.5 rounded-md border transition-colors cursor-pointer
+              ${templatesOpen
+                ? 'bg-teal/20 border-teal/40 text-teal'
+                : 'bg-white/8 border-white/15 text-white/60 hover:text-white hover:bg-white/14'}`}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <path d="M3 9h18M9 21V9"/>
+            </svg>
+          </button>
+
           {/* Settings toggle */}
           <button
-            onClick={() => setSettingsOpen(o => !o)}
+            onClick={settingsOpen ? () => setSettingsOpen(false) : openSettings}
             aria-label="Configuración"
             className={`p-1.5 rounded-md border transition-colors cursor-pointer
               ${settingsOpen
@@ -296,7 +194,6 @@ export default function App() {
 
         {/* Editor pane */}
         <div
-          ref={editorPaneRef}
           className="flex flex-col flex-1 min-w-0 rounded-xl overflow-hidden relative
                      bg-white/8 backdrop-blur-xl border border-white/12 shadow-2xl"
         >
@@ -312,7 +209,7 @@ export default function App() {
             ref={textareaRef}
             value={markdown}
             onChange={handleEditorChange}
-            onKeyDown={handleEditorKeyDown}
+            onKeyDown={handleSlashKeyDown}
             spellCheck={false}
             aria-label="Editor de markdown"
             className="flex-1 w-full resize-none bg-transparent outline-none
@@ -349,7 +246,7 @@ export default function App() {
           />
         </div>
 
-        {/* Settings panel — slides in over preview area */}
+        {/* Settings panel */}
         <div className={`flex shrink-0 overflow-hidden rounded-xl transition-all duration-300 ease-in-out
                          ${settingsOpen ? 'w-68 opacity-100' : 'w-0 opacity-0'}`}>
           {settingsOpen && (
@@ -357,6 +254,22 @@ export default function App() {
               settings={docSettings}
               onChange={setDocSettings}
               onClose={() => setSettingsOpen(false)}
+            />
+          )}
+        </div>
+
+        {/* Templates panel */}
+        <div className={`flex shrink-0 overflow-hidden rounded-xl transition-all duration-300 ease-in-out
+                         ${templatesOpen ? 'w-72 opacity-100' : 'w-0 opacity-0'}`}>
+          {templatesOpen && (
+            <TemplatesPanel
+              templates={templates}
+              currentMarkdown={markdown}
+              currentSettings={docSettings}
+              onSave={saveTemplate}
+              onApply={handleApplyTemplate}
+              onDelete={deleteTemplate}
+              onClose={() => setTemplatesOpen(false)}
             />
           )}
         </div>
