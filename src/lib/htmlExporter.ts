@@ -1,5 +1,6 @@
 import type { ParseResult } from './markdownParser'
-import type { DocSettings } from '../types'
+import type { DocSettings, BrandColors } from '../types'
+import { defaultBrandColors } from '../types'
 
 function esc(text: string): string {
   return text
@@ -9,14 +10,17 @@ function esc(text: string): string {
     .replace(/"/g, '&quot;')
 }
 
-const SGRSI_CSS = `
+function buildCss(c: BrandColors): string {
+  return `
   :root {
-    --navy:  #001C30;
-    --teal:  #176B87;
-    --aqua:  #64CCC5;
-    --frost: #DAFFFB;
-  }
+    --navy:  ${c.navy};
+    --teal:  ${c.teal};
+    --aqua:  ${c.aqua};
+    --frost: ${c.frost};
+  }`
+}
 
+const STATIC_CSS = `
   *, *::before, *::after { box-sizing: border-box; }
 
   body {
@@ -200,9 +204,6 @@ const SGRSI_CSS = `
 
   /* Footer */
   footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     margin-top: 64px;
     padding-top: 16px;
     border-top: 1px solid rgba(0, 28, 48, 0.1);
@@ -210,8 +211,24 @@ const SGRSI_CSS = `
     color: rgba(0, 28, 48, 0.4);
     font-family: 'IBM Plex Sans', sans-serif;
   }
+  .footer-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
   .footer-left { display: flex; align-items: center; gap: 5px; }
   .footer-left i[data-lucide] { width: 13px; height: 13px; stroke: rgba(23,107,135,0.5); top: 0; }
+  .footer-attribution {
+    margin-top: 10px;
+    text-align: center;
+    font-size: 9px;
+    letter-spacing: 0.05em;
+    color: rgba(0, 28, 48, 0.25);
+  }
+  .footer-attribution a {
+    color: rgba(23, 107, 135, 0.45);
+    text-decoration: none;
+  }
 
   @media print {
     body { font-size: 12px; }
@@ -224,6 +241,7 @@ const SGRSI_CSS = `
 
 export function generateHTML(result: ParseResult, settings: DocSettings): string {
   const { title, subtitle, bodyHtml } = result
+  const colors = settings.brandColors ?? defaultBrandColors
 
   const eyebrow = settings.type === 'acta'
     ? 'ACTA · SGRSI · ITI CETP · 2026'
@@ -257,7 +275,7 @@ export function generateHTML(result: ParseResult, settings: DocSettings): string
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&family=IBM+Plex+Sans:wght@300;400;500&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-  <style>${SGRSI_CSS}</style>
+  <style>${buildCss(colors)}${STATIC_CSS}</style>
 </head>
 <body>
   ${watermark}
@@ -270,11 +288,16 @@ export function generateHTML(result: ParseResult, settings: DocSettings): string
     </header>
     <main>${bodyHtml}</main>
     <footer>
-      <span class="footer-left">
-        <i data-lucide="shield" class="icon-inline"></i>
-        ${esc(footerLeft)}
-      </span>
-      <span>${esc(footerRight)}</span>
+      <div class="footer-main">
+        <span class="footer-left">
+          <i data-lucide="shield" class="icon-inline"></i>
+          ${esc(footerLeft)}
+        </span>
+        <span>${esc(footerRight)}</span>
+      </div>
+      <div class="footer-attribution">
+        Creado con <a href="https://github.com/itica-lat/eternum-actas" target="_blank" rel="noopener noreferrer">Eternum Actas</a> &middot; &copy; ${new Date().getFullYear()} ITICA
+      </div>
     </footer>
   </div>
   <script>lucide.createIcons();</script>
