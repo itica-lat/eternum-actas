@@ -1,4 +1,5 @@
-import type { DocSettings } from '../types'
+import type { DocSettings, BrandColors } from '../types'
+import { BRAND_PRESETS, defaultBrandColors } from '../types'
 
 interface Props {
   settings: DocSettings
@@ -73,6 +74,13 @@ function FieldInput({
 export function SettingsPanel({ settings, onChange, onClose }: Props) {
   const set = <K extends keyof DocSettings>(key: K, value: DocSettings[K]) =>
     onChange({ ...settings, [key]: value })
+
+  const setColor = (key: keyof BrandColors, value: string) =>
+    set('brandColors', { ...settings.brandColors, [key]: value })
+
+  const applyPreset = (colors: BrandColors) => set('brandColors', colors)
+
+  const isDefaultPreset = JSON.stringify(settings.brandColors) === JSON.stringify(defaultBrandColors)
 
   return (
     <div className="flex flex-col w-68 shrink-0 h-full
@@ -204,6 +212,91 @@ export function SettingsPanel({ settings, onChange, onClose }: Props) {
               </div>
             </div>
           )}
+        </section>
+
+        <div className="h-px bg-white/8" />
+
+        {/* ── Colores de marca ── */}
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[9px] font-medium tracking-[0.14em] uppercase text-aqua/60">
+              Colores de marca
+            </span>
+            {!isDefaultPreset && (
+              <button
+                onClick={() => applyPreset(defaultBrandColors)}
+                className="text-[9px] text-white/30 hover:text-white/60 transition-colors cursor-pointer"
+              >
+                reset
+              </button>
+            )}
+          </div>
+
+          {/* Presets */}
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {BRAND_PRESETS.map(preset => {
+              const active = JSON.stringify(settings.brandColors) === JSON.stringify(preset.colors)
+              return (
+                <button
+                  key={preset.name}
+                  onClick={() => applyPreset(preset.colors)}
+                  title={preset.name}
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] border
+                              transition-colors cursor-pointer
+                              ${active
+                                ? 'border-aqua/40 bg-aqua/10 text-aqua/80'
+                                : 'border-white/10 bg-white/5 text-white/40 hover:border-white/20 hover:text-white/60'}`}
+                >
+                  {/* Mini palette dots */}
+                  <span className="flex gap-0.5">
+                    <span className="w-2 h-2 rounded-full" style={{ background: preset.colors.navy }} />
+                    <span className="w-2 h-2 rounded-full" style={{ background: preset.colors.teal }} />
+                    <span className="w-2 h-2 rounded-full" style={{ background: preset.colors.aqua }} />
+                  </span>
+                  {preset.name}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Custom pickers */}
+          <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+            {([ 
+              { key: 'navy',  label: 'Fondo / texto' },
+              { key: 'teal',  label: 'Primario'      },
+              { key: 'aqua',  label: 'Acento'        },
+              { key: 'frost', label: 'Claro'         },
+            ] as { key: keyof BrandColors; label: string }[]).map(({ key, label }) => (
+              <div key={key} className="flex flex-col gap-1">
+                <span className="text-[10px] text-white/40">{label}</span>
+                <label className="flex items-center gap-2 bg-white/8 border border-white/12
+                                  rounded-lg px-2 py-1.5 cursor-pointer hover:border-white/25
+                                  transition-colors group">
+                  <span
+                    className="w-4 h-4 rounded shrink-0 border border-white/20"
+                    style={{ background: settings.brandColors[key] }}
+                  />
+                  <span className="text-[10px] font-mono text-white/50 group-hover:text-white/70
+                                   transition-colors uppercase">
+                    {settings.brandColors[key]}
+                  </span>
+                  <input
+                    type="color"
+                    value={settings.brandColors[key]}
+                    onChange={e => setColor(key, e.target.value)}
+                    className="sr-only"
+                  />
+                </label>
+              </div>
+            ))}
+          </div>
+
+          {/* Live palette preview */}
+          <div className="mt-3 flex rounded-lg overflow-hidden h-4 border border-white/10">
+            {(['navy', 'teal', 'aqua', 'frost'] as (keyof BrandColors)[]).map(k => (
+              <div key={k} className="flex-1" style={{ background: settings.brandColors[k] }} />
+            ))}
+          </div>
         </section>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from 'react'
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { parseMarkdown } from './lib/markdownParser'
 import { generateHTML } from './lib/htmlExporter'
 import { buildMarkdownFromTemplate } from './lib/templateUtils'
@@ -15,14 +15,34 @@ import { useTemplates } from './hooks/useTemplates'
 import { EXAMPLE_MD } from './constants/exampleMarkdown'
 import './App.css'
 
+/** Read the single autosave entry once; used to hydrate the initial component state. */
+function getInitialState() {
+  const saved = loadAutoSave()
+  return {
+    markdown:    saved?.markdown ?? EXAMPLE_MD,
+    filename:    saved?.filename ?? 'documento',
+    docSettings: {
+      ...defaultDocSettings,
+      ...(saved?.docSettings ?? {}),
+      // Deep-merge brandColors so fields added after the last save are always defined
+      brandColors: {
+        ...defaultDocSettings.brandColors,
+        ...(saved?.docSettings?.brandColors ?? {}),
+      },
+    } satisfies DocSettings,
+    wasRestored: !!saved,
+  }
+}
+
+const initialState = getInitialState()
+
 export default function App() {
-  // Restore from autosave on first mount, fall back to defaults
-  const [markdown, setMarkdown]         = useState(() => loadAutoSave()?.markdown    ?? EXAMPLE_MD)
-  const [filename, setFilename]         = useState(() => loadAutoSave()?.filename    ?? 'documento')
-  const [docSettings, setDocSettings]   = useState<DocSettings>(() => loadAutoSave()?.docSettings ?? defaultDocSettings)
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [markdown, setMarkdown]           = useState(initialState.markdown)
+  const [filename, setFilename]           = useState(initialState.filename)
+  const [docSettings, setDocSettings]     = useState<DocSettings>(initialState.docSettings)
+  const [settingsOpen, setSettingsOpen]   = useState(false)
   const [templatesOpen, setTemplatesOpen] = useState(false)
-  const wasRestored = useRef(!!loadAutoSave())
+  const wasRestored = useRef(initialState.wasRestored)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const iframeRef   = useRef<HTMLIFrameElement>(null)
@@ -37,6 +57,16 @@ export default function App() {
   const { fileInputRef, triggerFileLoad, handleFileLoad } = useFileLoad({ setMarkdown, setFilename })
   const { status: saveStatus } = useAutoSave(markdown, filename, docSettings)
   const { templates, saveTemplate, deleteTemplate } = useTemplates()
+
+  // Sync brand colors → CSS custom properties so Tailwind utilities update live
+  useEffect(() => {
+    const root = document.documentElement
+    const { navy, teal, aqua, frost } = docSettings.brandColors
+    root.style.setProperty('--color-navy',  navy)
+    root.style.setProperty('--color-teal',  teal)
+    root.style.setProperty('--color-aqua',  aqua)
+    root.style.setProperty('--color-frost', frost)
+  }, [docSettings.brandColors])
 
   const handleEditorChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMarkdown(e.target.value)
@@ -274,6 +304,27 @@ export default function App() {
         </div>
 
       </div>
+
+      {/* ── Footer watermark ── */}
+      <footer className="shrink-0 flex items-center justify-center gap-1.5 h-7
+                         bg-navy/60 backdrop-blur-md border-t border-white/8">
+        <span className="text-white/25 text-[10px] select-none tracking-wide">
+          Creado con
+        </span>
+        <a
+          href="https://github.com/itica-lat/eternum-actas"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-aqua/50 hover:text-aqua text-[10px] font-medium tracking-wide
+                     transition-colors duration-200 underline-offset-2 hover:underline"
+        >
+          Eternum Actas
+        </a>
+        <span className="text-white/20 text-[10px] select-none">·</span>
+        <span className="text-white/20 text-[10px] select-none tracking-wide">
+          © {new Date().getFullYear()} ITICA
+        </span>
+      </footer>
     </div>
   )
 }
