@@ -1,39 +1,80 @@
-export const EXAMPLE_MD = `# Guía de preguntas para el relevamiento
-_Uso interno del equipo · no distribuir sin revisión_
+export const EXAMPLE_MD = `# Bienvenido a Eternum Actas
+_Escribí tu documento en el panel izquierdo y verás el resultado aquí_
 
-## :icon:user: Contexto y rol del entrevistado
+## :icon:info: ¿Cómo funciona?
 
-### Duración estimada · 5 min
+Este editor convierte texto en formato Markdown a un documento HTML listo para imprimir o exportar como PDF.
 
-_«¿Cuál es tu rol en la coordinación de informática?»_
-
-_«¿Cuánto tiempo llevás en ese rol?»_
+Lo que escribís a la izquierda se transforma en tiempo real en la vista previa de la derecha.
 
 ---
 
-## :icon:flame: Puntos de dolor
+## :icon:type: Título y subtítulo
 
-> La frecuencia e impacto de cada dolor definen la priorización de módulos.
+La primera línea con \`# \` es el **título principal** del documento.
+La línea siguiente entre guiones bajos se convierte en el **subtítulo** (como el que ves arriba).
 
-- ¿Con qué frecuencia pasa eso?
-- ¿Cuánto tiempo llevó resolverlo?
-- ¿Qué impacto tuvo en la clase?
+### Secciones y subsecciones
+
+Usá \`## \` para secciones principales y \`### \` para subsecciones como esta.
 
 ---
 
-## :icon:git-branch: Estado actual del sistema
+## :icon:sparkles: Elementos especiales
 
-1. ¿Qué herramientas usás hoy para registrar incidentes?
-2. ¿Cómo se comunica el estado de un equipo a dirección?
-3. ¿Existe algún registro histórico accesible?
+Estos elementos van dentro de cualquier párrafo, título o lista.
 
-### Nota sobre el módulo de reportes
+### Íconos
 
-El sistema actual **no exporta** datos estructurados. Verificar si hay registros en \`hojas de cálculo\` o correos.
+Escribí \`:icon:nombre:\` para insertar un ícono de Lucide.
+Ejemplos: :icon:check-circle: aprobado · :icon:alert-triangle: atención · :icon:calendar: fecha
 
-Módulo priorizado: :badge:alta prioridad:
+### Etiquetas :badge:badge:
+
+Escribí \`:badge:texto:\` para resaltar un estado o categoría.
+Ejemplos: :badge:urgente: · :badge:en revisión: · :badge:cerrado:
+
+### Texto con énfasis
+
+Usá \`**negrita**\` para **texto importante** y \`_cursiva_\` para _aclaraciones o citas_.
+Usá \`\`código\`\` para referencias técnicas como \`CTRL+S\` o nombres de archivos.
+
+---
+
+## :icon:list: Listas
+
+### Lista de ítems
+
+- Primer punto sin orden particular
+- Segundo punto con **énfasis** si hace falta
+- Tercer punto con un :icon:arrow-right: ícono inline
+
+### Lista numerada
+
+1. Este paso va primero
+2. Luego este
+3. Y finalmente este
+
+---
+
+## :icon:message-square: Citas y notas
+
+> Usá el símbolo \`>\` al inicio para destacar una nota, advertencia o cita importante.
+> Podés extenderla en varias líneas seguidas.
+
+---
+
+## :icon:book-open: Referencias
+
+Agregá \`---refs---\` al final para crear un bloque de referencias en formato APA.
+Todo lo que siga después se renderiza como referencias bibliográficas.
+
+---
+
+## :icon:zap: Atajo rápido
+
+Escribí \`/\` en cualquier parte del editor para abrir la paleta de comandos y insertar elementos sin recordar la sintaxis.
 
 ---refs---
-ITI CETP. (2026). *Documento del proyecto SGRSI*. Interno.
-Equipo Eternum. (2026). *Guía de relevamiento v1*. Uso interno.
+Equipo Eternum. (2026). *Documentación interna del generador de actas*. ITI CETP.
 `

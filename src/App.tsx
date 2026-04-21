@@ -44,8 +44,9 @@ export default function App() {
   const [templatesOpen, setTemplatesOpen] = useState(false)
   const wasRestored = useRef(initialState.wasRestored)
 
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const iframeRef   = useRef<HTMLIFrameElement>(null)
+  const textareaRef       = useRef<HTMLTextAreaElement>(null)
+  const iframeRef         = useRef<HTMLIFrameElement>(null)
+  const prevDocSettingsRef = useRef<DocSettings | null>(null)
 
   const parseResult = useMemo(() => parseMarkdown(markdown), [markdown])
   const fullHTML    = useMemo(() => generateHTML(parseResult, docSettings), [parseResult, docSettings])
@@ -57,6 +58,31 @@ export default function App() {
   const { fileInputRef, triggerFileLoad, handleFileLoad } = useFileLoad({ setMarkdown, setFilename })
   const { status: saveStatus } = useAutoSave(markdown, filename, docSettings)
   const { templates, saveTemplate, deleteTemplate } = useTemplates()
+
+  // Sync generated HTML into the preview iframe, preserving scroll position
+  useEffect(() => {
+    const iframe = iframeRef.current
+    if (!iframe) return
+    const doc = iframe.contentDocument ?? iframe.contentWindow?.document
+    if (!doc) return
+
+    const settingsChanged = prevDocSettingsRef.current !== docSettings
+    prevDocSettingsRef.current = docSettings
+
+    // Full reload only when settings change (CSS is embedded in <head>)
+    if (settingsChanged || !doc.body) {
+      const scrollY = iframe.contentWindow?.scrollY ?? 0
+      doc.open()
+      doc.write(fullHTML)
+      doc.close()
+      requestAnimationFrame(() => iframe.contentWindow?.scrollTo(0, scrollY))
+      return
+    }
+
+    // Markdown-only change: patch body in place — no document reload, no scroll reset
+    const match = fullHTML.match(/<body[^>]*>([\s\S]*)<\/body>/i)
+    if (match) doc.body.innerHTML = match[1]
+  }, [fullHTML, docSettings])
 
   // Sync brand colors → CSS custom properties so Tailwind utilities update live
   useEffect(() => {
