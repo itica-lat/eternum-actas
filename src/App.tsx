@@ -42,6 +42,8 @@ export default function App() {
   const [docSettings, setDocSettings]     = useState<DocSettings>(initialState.docSettings)
   const [settingsOpen, setSettingsOpen]   = useState(false)
   const [templatesOpen, setTemplatesOpen] = useState(false)
+  const [activePane, setActivePane]       = useState<'editor' | 'preview'>('editor')
+  const [menuOpen, setMenuOpen]           = useState(false)
   const wasRestored = useRef(initialState.wasRestored)
 
   const textareaRef       = useRef<HTMLTextAreaElement>(null)
@@ -100,8 +102,8 @@ export default function App() {
   }, [detectSlash])
 
   // Opening one panel closes the other
-  const openSettings  = useCallback(() => { setSettingsOpen(true);  setTemplatesOpen(false) }, [])
-  const openTemplates = useCallback(() => { setTemplatesOpen(true); setSettingsOpen(false)  }, [])
+  const openSettings  = useCallback(() => { setSettingsOpen(true);  setTemplatesOpen(false); setMenuOpen(false) }, [])
+  const openTemplates = useCallback(() => { setTemplatesOpen(true); setSettingsOpen(false);  setMenuOpen(false) }, [])
 
   const handleApplyTemplate = useCallback((tpl: Template) => {
     setDocSettings(tpl.docSettings)
@@ -113,42 +115,41 @@ export default function App() {
   const notices     = parseResult.warnings.filter(w => !w.startsWith('Error:'))
   const hasWarnings = errors.length > 0 || notices.length > 0
 
+  const mobileOverlay = settingsOpen || templatesOpen
+
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-navy via-[#0a2e4a] to-teal overflow-hidden font-sans">
 
       {/* ── Topbar ── */}
-      <header className="flex items-center justify-between px-5 h-12 shrink-0
-                         bg-navy/70 backdrop-blur-md border-b border-white/10 shadow-lg">
-        <div className="flex items-center gap-3">
+      <header className="relative flex items-center justify-between px-3 md:px-5 h-12 shrink-0
+                         bg-navy/70 backdrop-blur-md border-b border-white/10 shadow-lg z-40">
+
+        {/* Left: brand */}
+        <div className="flex items-center gap-2 md:gap-3">
           <span className="text-aqua font-semibold text-sm tracking-widest uppercase">Eternum</span>
-          <span className="w-px h-4 bg-white/15" />
-          <span className="text-white/50 text-xs font-light">Generador de documentos</span>
-          {/* Doc type chip */}
+          <span className="hidden md:block w-px h-4 bg-white/15" />
+          <span className="hidden md:inline text-white/50 text-xs font-light">Generador de documentos</span>
           <span className="px-2 py-0.5 rounded-md text-[10px] border border-aqua/25
                            text-aqua/70 bg-aqua/8 tracking-wide uppercase font-medium">
             {docSettings.type === 'acta' ? 'Acta' : 'Documento'}
           </span>
-          {/* Restored from autosave badge (shown once) */}
           {wasRestored.current && (
-            <span className="px-2 py-0.5 rounded-md text-[10px] border border-amber-400/25
+            <span className="hidden md:inline px-2 py-0.5 rounded-md text-[10px] border border-amber-400/25
                              text-amber-300/70 bg-amber-400/8 tracking-wide">
               retomado
             </span>
           )}
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Autosave indicator */}
+        {/* ── Desktop actions (md+) ── */}
+        <div className="hidden md:flex items-center gap-2">
           <span className={`text-[10px] transition-opacity duration-300
             ${saveStatus === 'pending' ? 'text-white/30 opacity-100' : ''}
             ${saveStatus === 'saved'   ? 'text-aqua/50 opacity-100' : ''}
             ${saveStatus === 'idle'    ? 'opacity-0'               : ''}`}>
             {saveStatus === 'pending' ? '○ guardando…' : '● guardado'}
           </span>
-
           <span className="w-px h-4 bg-white/15" />
-
-          {/* Filename */}
           <div className="flex items-center bg-white/8 border border-white/15 rounded-md overflow-hidden">
             <input
               type="text"
@@ -161,8 +162,6 @@ export default function App() {
             />
             <span className="text-white/30 font-mono text-xs pr-2.5 select-none">.html</span>
           </div>
-
-          {/* Load */}
           <button onClick={triggerFileLoad}
             className="px-3 py-1.5 rounded-md text-xs bg-white/8 border border-white/15
                        text-white/70 hover:bg-white/14 hover:text-white transition-colors cursor-pointer">
@@ -170,11 +169,7 @@ export default function App() {
           </button>
           <input ref={fileInputRef} type="file" accept=".md,text/markdown"
                  onChange={handleFileLoad} className="hidden" />
-
-          {/* Separator */}
           <span className="w-px h-4 bg-white/15" />
-
-          {/* Export PDF */}
           <button onClick={handleExportPDF}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs
                        bg-white/8 border border-white/15 text-white/70
@@ -186,20 +181,16 @@ export default function App() {
             </svg>
             PDF
           </button>
-
-          {/* Export HTML */}
           <button onClick={handleDownloadHTML} disabled={errors.length > 0}
             className="px-3 py-1.5 rounded-md text-xs bg-teal text-white font-medium
                        hover:bg-teal/80 disabled:opacity-40 disabled:cursor-not-allowed
                        transition-colors cursor-pointer">
             Exportar HTML
           </button>
-
-          {/* Templates toggle */}
+          <span className="w-px h-4 bg-white/15" />
           <button
             onClick={templatesOpen ? () => setTemplatesOpen(false) : openTemplates}
-            aria-label="Plantillas"
-            title="Plantillas"
+            aria-label="Plantillas" title="Plantillas"
             className={`p-1.5 rounded-md border transition-colors cursor-pointer
               ${templatesOpen
                 ? 'bg-teal/20 border-teal/40 text-teal'
@@ -211,8 +202,6 @@ export default function App() {
               <path d="M3 9h18M9 21V9"/>
             </svg>
           </button>
-
-          {/* Settings toggle */}
           <button
             onClick={settingsOpen ? () => setSettingsOpen(false) : openSettings}
             aria-label="Configuración"
@@ -228,11 +217,126 @@ export default function App() {
             </svg>
           </button>
         </div>
+
+        {/* ── Mobile actions (< md) ── */}
+        <div className="flex md:hidden items-center gap-1.5">
+          {/* Templates */}
+          <button
+            onClick={templatesOpen ? () => { setTemplatesOpen(false); setMenuOpen(false) } : openTemplates}
+            aria-label="Plantillas"
+            className={`p-1.5 rounded-md border transition-colors cursor-pointer
+              ${templatesOpen
+                ? 'bg-teal/20 border-teal/40 text-teal'
+                : 'bg-white/8 border-white/15 text-white/60 hover:text-white hover:bg-white/14'}`}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <path d="M3 9h18M9 21V9"/>
+            </svg>
+          </button>
+          {/* Settings */}
+          <button
+            onClick={settingsOpen ? () => { setSettingsOpen(false); setMenuOpen(false) } : openSettings}
+            aria-label="Configuración"
+            className={`p-1.5 rounded-md border transition-colors cursor-pointer
+              ${settingsOpen
+                ? 'bg-teal/20 border-teal/40 text-teal'
+                : 'bg-white/8 border-white/15 text-white/60 hover:text-white hover:bg-white/14'}`}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+          {/* Overflow menu toggle */}
+          <button
+            onClick={() => setMenuOpen(v => !v)}
+            aria-label="Más opciones"
+            className={`p-1.5 rounded-md border transition-colors cursor-pointer
+              ${menuOpen
+                ? 'bg-teal/20 border-teal/40 text-teal'
+                : 'bg-white/8 border-white/15 text-white/60 hover:text-white hover:bg-white/14'}`}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="5" r="1" fill="currentColor"/>
+              <circle cx="12" cy="12" r="1" fill="currentColor"/>
+              <circle cx="12" cy="19" r="1" fill="currentColor"/>
+            </svg>
+          </button>
+        </div>
+
+        {/* ── Mobile dropdown menu ── */}
+        {menuOpen && (
+          <div className="md:hidden absolute top-full left-0 right-0 z-50
+                          bg-navy/97 backdrop-blur-md border-b border-white/10 shadow-2xl
+                          px-4 py-3 flex flex-col gap-3">
+            {/* Filename */}
+            <div className="flex items-center bg-white/8 border border-white/15 rounded-md overflow-hidden">
+              <input
+                type="text"
+                value={filename}
+                onChange={e => setFilename(e.target.value)}
+                placeholder="nombre-archivo"
+                aria-label="Nombre del archivo"
+                className="flex-1 bg-transparent text-white font-mono text-xs px-3 py-2
+                           outline-none placeholder:text-white/25 focus:ring-1 focus:ring-aqua/50"
+              />
+              <span className="text-white/30 font-mono text-xs pr-3 select-none">.html</span>
+            </div>
+            {/* Action buttons row */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => { triggerFileLoad(); setMenuOpen(false) }}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs
+                           bg-white/8 border border-white/15 text-white/70
+                           hover:bg-white/14 hover:text-white transition-colors cursor-pointer">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                Cargar .md
+              </button>
+              <button
+                onClick={() => { handleExportPDF(); setMenuOpen(false) }}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs
+                           bg-white/8 border border-white/15 text-white/70
+                           hover:bg-white/14 hover:text-white transition-colors cursor-pointer">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                </svg>
+                Exportar PDF
+              </button>
+              <button
+                onClick={() => { handleDownloadHTML(); setMenuOpen(false) }}
+                disabled={errors.length > 0}
+                className="flex-1 flex items-center justify-center px-3 py-2 rounded-md text-xs
+                           bg-teal text-white font-medium hover:bg-teal/80
+                           disabled:opacity-40 disabled:cursor-not-allowed
+                           transition-colors cursor-pointer">
+                Exportar HTML
+              </button>
+            </div>
+            {/* Autosave status */}
+            <span className={`text-[10px] text-center transition-opacity duration-300
+              ${saveStatus === 'pending' ? 'text-white/30' : ''}
+              ${saveStatus === 'saved'   ? 'text-aqua/50'  : ''}
+              ${saveStatus === 'idle'    ? 'opacity-0'     : ''}`}>
+              {saveStatus === 'pending' ? '○ guardando…' : '● guardado'}
+            </span>
+          </div>
+        )}
       </header>
 
       {/* ── Warnings ── */}
       {hasWarnings && (
-        <div className="flex flex-wrap gap-1.5 px-5 py-2 shrink-0
+        <div className="flex flex-wrap gap-1.5 px-4 py-2 shrink-0
                         bg-amber-400/15 backdrop-blur-sm border-b border-amber-300/20">
           {errors.map((w, i) => (
             <span key={i} className="text-[11px] px-2 py-0.5 rounded bg-red-400/20
@@ -245,13 +349,52 @@ export default function App() {
         </div>
       )}
 
+      {/* ── Mobile tab bar (below topbar, hidden on md+) ── */}
+      <div className="md:hidden flex shrink-0 bg-navy/50 backdrop-blur-md border-b border-white/10">
+        {mobileOverlay ? (
+          <button
+            onClick={() => { setSettingsOpen(false); setTemplatesOpen(false) }}
+            className="flex items-center gap-2 px-4 py-2.5 text-xs text-white/60
+                       hover:text-white transition-colors cursor-pointer"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 12H5M12 19l-7-7 7-7"/>
+            </svg>
+            Volver al editor
+          </button>
+        ) : (
+          <>
+            <button
+              onClick={() => { setActivePane('editor'); setMenuOpen(false) }}
+              className={`flex-1 py-2.5 text-xs font-medium transition-colors cursor-pointer
+                ${activePane === 'editor'
+                  ? 'text-aqua border-b-2 border-aqua bg-white/5'
+                  : 'text-white/45 hover:text-white/70'}`}
+            >
+              Editor
+            </button>
+            <button
+              onClick={() => { setActivePane('preview'); setMenuOpen(false) }}
+              className={`flex-1 py-2.5 text-xs font-medium transition-colors cursor-pointer
+                ${activePane === 'preview'
+                  ? 'text-aqua border-b-2 border-aqua bg-white/5'
+                  : 'text-white/45 hover:text-white/70'}`}
+            >
+              Vista previa
+            </button>
+          </>
+        )}
+      </div>
+
       {/* ── Workspace ── */}
-      <div className="flex flex-1 gap-4 p-4 overflow-hidden">
+      <div className="flex flex-1 gap-2 p-2 md:gap-4 md:p-4 overflow-hidden">
 
         {/* Editor pane */}
         <div
-          className="flex flex-col flex-1 min-w-0 rounded-xl overflow-hidden relative
-                     bg-white/8 backdrop-blur-xl border border-white/12 shadow-2xl"
+          className={`flex-col flex-1 min-w-0 rounded-xl overflow-hidden relative
+                      bg-white/8 backdrop-blur-xl border border-white/12 shadow-2xl
+                      ${mobileOverlay || activePane !== 'editor' ? 'hidden md:flex' : 'flex'}`}
         >
           <div className="px-4 py-2 shrink-0 border-b border-white/10 bg-white/5">
             <span className="text-[10px] font-medium tracking-widest uppercase text-aqua/70">
@@ -269,7 +412,7 @@ export default function App() {
             spellCheck={false}
             aria-label="Editor de markdown"
             className="flex-1 w-full resize-none bg-transparent outline-none
-                       px-5 py-4 font-mono text-[12.5px] leading-[1.75]
+                       px-4 py-4 md:px-5 font-mono text-[12.5px] leading-[1.75]
                        text-frost/90 caret-aqua placeholder:text-white/20"
           />
 
@@ -286,8 +429,11 @@ export default function App() {
         </div>
 
         {/* Preview pane */}
-        <div className="flex flex-col flex-1 min-w-0 rounded-xl overflow-hidden
-                        bg-white/10 backdrop-blur-xl border border-white/15 shadow-2xl">
+        <div
+          className={`flex-col flex-1 min-w-0 rounded-xl overflow-hidden
+                      bg-white/10 backdrop-blur-xl border border-white/15 shadow-2xl
+                      ${mobileOverlay || activePane !== 'preview' ? 'hidden md:flex' : 'flex'}`}
+        >
           <div className="px-4 py-2 shrink-0 border-b border-white/10 bg-white/5">
             <span className="text-[10px] font-medium tracking-widest uppercase text-aqua/70">
               Vista previa
@@ -301,9 +447,11 @@ export default function App() {
           />
         </div>
 
-        {/* Settings panel */}
-        <div className={`flex shrink-0 overflow-hidden rounded-xl transition-all duration-300 ease-in-out
-                         ${settingsOpen ? 'w-68 opacity-100' : 'w-0 opacity-0'}`}>
+        {/* Settings panel — full width on mobile, side panel on desktop */}
+        <div className={`flex-col shrink-0 overflow-hidden rounded-xl transition-all duration-300 ease-in-out
+                         ${settingsOpen
+                           ? 'flex w-full md:w-68 opacity-100'
+                           : 'hidden md:flex md:w-0 md:opacity-0'}`}>
           {settingsOpen && (
             <SettingsPanel
               settings={docSettings}
@@ -313,9 +461,11 @@ export default function App() {
           )}
         </div>
 
-        {/* Templates panel */}
-        <div className={`flex shrink-0 overflow-hidden rounded-xl transition-all duration-300 ease-in-out
-                         ${templatesOpen ? 'w-72 opacity-100' : 'w-0 opacity-0'}`}>
+        {/* Templates panel — full width on mobile, side panel on desktop */}
+        <div className={`flex-col shrink-0 overflow-hidden rounded-xl transition-all duration-300 ease-in-out
+                         ${templatesOpen
+                           ? 'flex w-full md:w-72 opacity-100'
+                           : 'hidden md:flex md:w-0 md:opacity-0'}`}>
           {templatesOpen && (
             <TemplatesPanel
               templates={templates}
