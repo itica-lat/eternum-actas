@@ -72,6 +72,47 @@ export default function App() {
   const parseResult = useMemo(() => parseMarkdown(markdown), [markdown])
   const fullHTML    = useMemo(() => generateHTML(parseResult, docSettings), [parseResult, docSettings])
 
+  // Render preview into the iframe without triggering a navigation.
+  // First paint: full document write (necessary to set up <head>, fonts, CSS).
+  // Subsequent updates: swap only <body> innerHTML — the document stays alive,
+  // scroll position is never reset, and fonts/styles are already loaded.
+  const previewMounted = useRef(false)
+  useEffect(() => {
+    const iframe = iframeRef.current
+    if (!iframe) return
+
+    const writeInitial = () => {
+      const doc = iframe.contentDocument || iframe.contentWindow?.document
+      if (!doc) return
+      doc.open()
+      doc.write(fullHTML)
+      doc.close()
+      previewMounted.current = true
+    }
+
+    const updateBody = () => {
+      const doc = iframe.contentDocument || iframe.contentWindow?.document
+      const win = iframe.contentWindow as (Window & { lucide?: { createIcons: () => void } }) | null
+      if (!doc || !win) return
+
+      // Parse the new HTML and replace only <body> so <head> (fonts, CSS) is untouched
+      // and the document is never navigated — scroll position stays intact.
+      const newDoc = new DOMParser().parseFromString(fullHTML, 'text/html')
+      doc.body.innerHTML = newDoc.body.innerHTML
+
+      // Scripts injected via innerHTML don't auto-execute; re-init Lucide manually.
+      win.lucide?.createIcons()
+    }
+
+    if (!previewMounted.current) {
+      writeInitial()
+      return
+    }
+
+    const timer = setTimeout(updateBody, 400)
+    return () => clearTimeout(timer)
+  }, [fullHTML])
+
   // Set cursor after markdown state update
   useEffect(() => {
     if (pendingCursorRef.current !== null && textareaRef.current) {
@@ -342,9 +383,8 @@ export default function App() {
           </div>
           <iframe
             ref={iframeRef}
-            srcDoc={fullHTML}
             title="Vista previa del documento"
-            sandbox="allow-scripts"
+            sandbox="allow-scripts allow-same-origin"
             className="flex-1 w-full border-none bg-white"
           />
         </div>

@@ -13,11 +13,12 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className={`relative shrink-0 w-8 h-4.5 rounded-full transition-colors cursor-pointer
-        ${checked ? 'bg-teal' : 'bg-white/20'}`}
+      className="relative shrink-0 w-8 h-5 rounded-full transition-colors cursor-pointer outline-none overflow-hidden"
+      style={{ backgroundColor: checked ? '#176B87' : 'rgba(255,255,255,0.2)' }}
     >
-      <span className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white shadow-sm transition-transform
-        ${checked ? 'translate-x-[17px]' : 'translate-x-0.5'}`}
+      <span
+        className="absolute left-0 top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform"
+        style={{ transform: checked ? 'translateX(14px)' : 'translateX(2px)' }}
       />
     </button>
   )
