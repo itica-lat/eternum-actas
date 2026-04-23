@@ -13,6 +13,7 @@ interface UseSlashCommandsProps {
   markdown: string
   setMarkdown: (value: string) => void
   textareaRef: React.RefObject<HTMLTextAreaElement | null>
+  onAction?: (action: string) => void
 }
 
 const LINE_HEIGHT   = 22  // matches font-size 12.5px * line-height 1.75
@@ -24,7 +25,7 @@ function computeOffsetTop(value: string, cursor: number, scrollTop: number): num
   return Math.max(MIN_OFFSET, PADDING_TOP + lines * LINE_HEIGHT - scrollTop)
 }
 
-export function useSlashCommands({ markdown, setMarkdown, textareaRef }: UseSlashCommandsProps) {
+export function useSlashCommands({ markdown, setMarkdown, textareaRef, onAction }: UseSlashCommandsProps) {
   const [slashTrigger, setSlashTrigger] = useState<SlashTrigger | null>(null)
   const pendingCursorRef = useRef<number | null>(null)
 
@@ -62,15 +63,22 @@ export function useSlashCommands({ markdown, setMarkdown, textareaRef }: UseSlas
 
   const insertSlashCommand = useCallback((cmd: SlashCommand) => {
     if (!slashTrigger || !textareaRef.current) return
-    const cursor  = textareaRef.current.selectionStart
-    const before  = markdown.slice(0, slashTrigger.slashStart)
-    const after   = markdown.slice(cursor)
-    const newCursor = slashTrigger.slashStart + cmd.snippet.length - (cmd.cursorOffset ?? 0)
+    const cursor = textareaRef.current.selectionStart
+    const before = markdown.slice(0, slashTrigger.slashStart)
+    const after  = markdown.slice(cursor)
 
+    if (cmd.action) {
+      setMarkdown(before + after)
+      setSlashTrigger(null)
+      onAction?.(cmd.action)
+      return
+    }
+
+    const newCursor = slashTrigger.slashStart + cmd.snippet.length - (cmd.cursorOffset ?? 0)
     pendingCursorRef.current = newCursor
     setMarkdown(before + cmd.snippet + after)
     setSlashTrigger(null)
-  }, [markdown, slashTrigger, textareaRef, setMarkdown])
+  }, [markdown, slashTrigger, textareaRef, setMarkdown, onAction])
 
   const handleSlashKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (!slashTrigger) return

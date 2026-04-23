@@ -5,6 +5,7 @@ import { buildMarkdownFromTemplate } from './lib/templateUtils'
 import { SlashPalette } from './components/SlashPalette'
 import { SettingsPanel } from './components/SettingsPanel'
 import { TemplatesPanel } from './components/TemplatesPanel'
+import { ConfirmModal } from './components/ConfirmModal'
 import { defaultDocSettings } from './types'
 import type { DocSettings, Template } from './types'
 import { useSlashCommands } from './hooks/useSlashCommands'
@@ -13,6 +14,7 @@ import { useFileLoad } from './hooks/useFileLoad'
 import { useAutoSave, loadAutoSave } from './hooks/useAutoSave'
 import { useTemplates } from './hooks/useTemplates'
 import { EXAMPLE_MD } from './constants/exampleMarkdown'
+import { USO_IA_TEMPLATE } from './constants/usoIaTemplate'
 import './App.css'
 
 /** Read the single autosave entry once; used to hydrate the initial component state. */
@@ -40,9 +42,11 @@ export default function App() {
   const [markdown, setMarkdown]           = useState(initialState.markdown)
   const [filename, setFilename]           = useState(initialState.filename)
   const [docSettings, setDocSettings]     = useState<DocSettings>(initialState.docSettings)
-  const [settingsOpen, setSettingsOpen]   = useState(false)
-  const [templatesOpen, setTemplatesOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen]     = useState(false)
+  const [templatesOpen, setTemplatesOpen]   = useState(false)
+  const [showUsoIaModal, setShowUsoIaModal] = useState(false)
   const wasRestored = useRef(initialState.wasRestored)
+  const pendingCursorRef = useRef<number | null>(null)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const iframeRef   = useRef<HTMLIFrameElement>(null)
@@ -50,8 +54,12 @@ export default function App() {
   const parseResult = useMemo(() => parseMarkdown(markdown), [markdown])
   const fullHTML    = useMemo(() => generateHTML(parseResult, docSettings), [parseResult, docSettings])
 
+  const handleAction = useCallback((action: string) => {
+    if (action === 'load-uso-ia') setShowUsoIaModal(true)
+  }, [])
+
   const { slashTrigger, detectSlash, closeSlash, insertSlashCommand, filteredCommands, handleSlashKeyDown } =
-    useSlashCommands({ markdown, setMarkdown, textareaRef })
+    useSlashCommands({ markdown, setMarkdown, textareaRef, onAction: handleAction })
 
   const { handleDownloadHTML, handleExportPDF } = useExport({ fullHTML, filename })
   const { fileInputRef, triggerFileLoad, handleFileLoad } = useFileLoad({ setMarkdown, setFilename })
@@ -68,6 +76,15 @@ export default function App() {
     root.style.setProperty('--color-frost', frost)
   }, [docSettings.brandColors])
 
+  // Apply cursor position requested by template loaders after markdown state settles
+  useEffect(() => {
+    if (pendingCursorRef.current === null || !textareaRef.current) return
+    const pos = pendingCursorRef.current
+    textareaRef.current.focus()
+    textareaRef.current.setSelectionRange(pos, pos)
+    pendingCursorRef.current = null
+  }, [markdown])
+
   const handleEditorChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMarkdown(e.target.value)
     detectSlash(e.target.value, e.target.selectionStart)
@@ -81,6 +98,20 @@ export default function App() {
     setDocSettings(tpl.docSettings)
     setMarkdown(buildMarkdownFromTemplate(tpl))
     setTemplatesOpen(false)
+  }, [])
+
+  const handleConfirmUsoIa = useCallback(() => {
+    setMarkdown(USO_IA_TEMPLATE)
+    setDocSettings(prev => ({
+      ...prev,
+      type: 'document',
+      headerEnabled: true,
+      headerProjectRef: 'SGRSI-2026',
+      footerLeft: 'Equipo Eternum · ITI CETP 2026',
+    }))
+    const firstBracket = USO_IA_TEMPLATE.indexOf('[')
+    if (firstBracket !== -1) pendingCursorRef.current = firstBracket
+    setShowUsoIaModal(false)
   }, [])
 
   const errors      = parseResult.warnings.filter(w => w.startsWith('Error:'))
@@ -305,6 +336,16 @@ export default function App() {
         </div>
 
       </div>
+
+      {/* ── Uso IA confirmation modal ── */}
+      {showUsoIaModal && (
+        <ConfirmModal
+          message="Esto va a reemplazar el contenido actual del editor. ¿Querés continuar?"
+          confirmLabel="Cargar plantilla"
+          onConfirm={handleConfirmUsoIa}
+          onCancel={() => setShowUsoIaModal(false)}
+        />
+      )}
 
       {/* ── Footer watermark ── */}
       <footer className="shrink-0 flex items-center justify-center gap-1.5 h-7

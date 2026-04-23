@@ -6,6 +6,8 @@ export interface SlashCommand {
   icon: string;
   /** Characters from end of snippet where cursor lands */
   cursorOffset?: number;
+  /** If set, snippet is ignored and the named action is dispatched instead */
+  action?: string;
 }
 
 export const SLASH_COMMANDS: SlashCommand[] = [
@@ -97,6 +99,14 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     description: 'Bloque de referencias APA',
     snippet: '\n---refs---\n',
     icon: 'book-open',
+  },
+  {
+    id: 'uso-ia',
+    label: 'Declaración uso IA',
+    description: 'Carga la plantilla de declaración de uso de inteligencia artificial',
+    snippet: '',
+    icon: 'bot',
+    action: 'load-uso-ia',
   },
 ];
 
