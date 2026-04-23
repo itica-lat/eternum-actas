@@ -1,75 +1,78 @@
-# React + TypeScript + Vite
+# Eternum Actas
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Generador de documentos institucionales para el proyecto SGRSI del ITI CETP. Permite redactar actas y documentos en Markdown con vista previa en tiempo real y exportarlos como HTML o PDF con una tipografía y paleta de colores consistente.
 
-Currently, two official plugins are available:
+## Caracteristicas
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Editor Markdown con slash commands** — escribi `/` en el editor para insertar encabezados, listas, bloques de cita, separadores, iconos Lucide y badges sin salir del teclado
+- **Vista previa en tiempo real** — renderizada en un iframe aislado con estilos IBM Plex y paleta de colores de marca
+- **Exportacion HTML** — genera un archivo `.html` autocontenido listo para archivar o compartir
+- **Exportacion PDF** — abre el dialogo de impresion del navegador con estilos de pagina optimizados
+- **Plantillas** — guarda el esqueleto del documento (encabezados + referencias) con su configuracion de estilo y reaplicalos en futuros documentos
+- **Autoguardado** — persiste el estado del editor en `localStorage`; al reabrir la app se retoma desde donde se dejo
+- **Configuracion de documento** — panel lateral para cambiar tipo (acta / documento), referencia, fecha, pie de pagina, marca de agua y colores de marca (con 5 presets incluidos)
 
-## React Compiler
+## Estructura del proyecto
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
-
-Note: This will impact Vite dev & build performances.
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+src/
+  App.tsx                  — componente raiz, orquesta estado y paneles
+  types.ts                 — tipos compartidos (DocSettings, Template, BrandColors)
+  components/
+    SlashPalette.tsx       — paleta flotante de slash commands
+    SettingsPanel.tsx      — panel lateral de configuracion
+    TemplatesPanel.tsx     — panel lateral de plantillas
+  hooks/
+    useSlashCommands.ts    — deteccion e insercion de slash commands
+    useExport.ts           — descarga HTML y apertura de PDF
+    useFileLoad.ts         — carga de archivos .md desde disco
+    useAutoSave.ts         — autoguardado en localStorage
+    useTemplates.ts        — CRUD de plantillas en localStorage
+  lib/
+    markdownParser.ts      — parser Markdown personalizado → HTML
+    htmlExporter.ts        — genera el documento HTML final con CSS embebido
+    slashCommands.ts       — definicion y filtrado de comandos disponibles
+    templateUtils.ts       — extraccion y reconstruccion de plantillas
+    lucideIcons.ts         — set de iconos Lucide validos
+  constants/
+    exampleMarkdown.ts     — documento de ejemplo que carga la app por primera vez
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Sintaxis Markdown soportada
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+| Elemento | Sintaxis |
+|---|---|
+| Titulo principal | `# Titulo` |
+| Subtitulo | `_subtitulo_` (linea inmediata despues del H1) |
+| Seccion | `## Seccion` |
+| Subseccion | `### Subseccion` |
+| Parrafo | texto plano |
+| **Negrita** | `**texto**` |
+| _Italica_ | `_texto_` |
+| `Codigo` | `` `codigo` `` |
+| Icono | `:icon:nombre-lucide:` |
+| Badge | `:badge:etiqueta:` |
+| Cita | `> texto` |
+| Lista | `- item` o `* item` |
+| Lista numerada | `1. item` |
+| Separador | `---` |
+| Bloque de referencias | `---refs---` seguido de lineas de texto |
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Desarrollo
+
+```bash
+bun install
+bun dev
 ```
+
+```bash
+bun run build   # compila TypeScript + empaqueta con Vite
+bun run lint    # ESLint
+bun run preview # sirve el build de produccion localmente
+```
+
+Requiere Node >= 18 o Bun >= 1.0.
+
+## Licencia
+
+© 2026 ITICA. Uso interno del equipo Eternum / proyecto SGRSI, ITI CETP.
