@@ -1,0 +1,20 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-eternum-actas
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    timeout-minutes: 10
+    steps:
+      - name: Deploy
+        run: |
+          bash /home/hermes/deploy/generic.sh \
+            "actas.eternum.lat" \
+            "git@github.com:itica-org/eternum-actas.git"
