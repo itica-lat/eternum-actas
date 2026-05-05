@@ -17,4 +17,4 @@ jobs:
         run: |
           bash /home/hermes/deploy/generic.sh \
             "actas.eternum.lat" \
-            "git@github.com:itica-org/eternum-actas.git"
+            "git@github.com:itica-lat/eternum-actas.git"
